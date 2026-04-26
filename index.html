@@ -1,30 +1,583 @@
-from pathlib import Path
-import re
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cozy Pup Companion - Tail Wag Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.3/dist/pixi.min.js"></script>
+  <style>
+    :root {
+      --cream: #fff7ef;
+      --peach: #ffd7bd;
+      --coral: #ff8f70;
+      --aqua: #9ee8df;
+      --mint: #c8f4dc;
+      --lav: #d9cdfc;
+      --ink: #332b2b;
+      --glass: rgba(255,255,255,.66);
+      --shadow: 0 18px 50px rgba(81, 51, 33, .18);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f8ead8; font-family: ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); }
+    button { font: inherit; border: 0; cursor: pointer; }
+    #appShell { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at top left, #fff2d7 0%, #f7d9c4 35%, #ddf7f2 100%); padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+    #phoneFrame { width: min(100vw, 440px); height: min(100dvh, 920px); max-height: 100dvh; border-radius: 34px; overflow: hidden; background: #fffaf0; box-shadow: 0 28px 80px rgba(58, 35, 22, .28); position: relative; border: 1px solid rgba(255,255,255,.7); }
+    #pixiMount { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+    #topHud { position: absolute; z-index: 10; top: 12px; left: 12px; right: 12px; display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .petCard, .coinsCard { background: var(--glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.7); box-shadow: var(--shadow); border-radius: 22px; padding: 10px 12px; }
+    .petCard h1 { margin: 0; font-size: 15px; line-height: 1.1; letter-spacing: -.02em; }
+    .petCard p { margin: 4px 0 0; font-size: 11px; opacity: .75; }
+    .coinsCard { display: flex; align-items: center; justify-content: center; font-weight: 900; min-width: 86px; font-size: 14px; gap: 4px; }
+    #statsPanel { position: absolute; z-index: 11; top: 86px; left: 12px; right: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .stat { background: rgba(255,255,255,.68); border: 1px solid rgba(255,255,255,.75); box-shadow: 0 8px 22px rgba(60,40,30,.12); border-radius: 18px; padding: 8px; }
+    .statTop { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 900; margin-bottom: 5px; }
+    .bar { height: 8px; background: rgba(72, 48, 35, .1); border-radius: 999px; overflow: hidden; }
+    .fill { height: 100%; width: 50%; border-radius: inherit; background: linear-gradient(90deg, #ffb26b, #ff7f6e); transition: width .35s ease; }
+    .fill.happiness { background: linear-gradient(90deg, #ff9bc8, #ff6ea7); }
+    .fill.cleanliness { background: linear-gradient(90deg, #79e0da, #4dbfc6); }
+    .fill.energy { background: linear-gradient(90deg, #b69bff, #8e77ff); }
+    #roomTabs { position: absolute; z-index: 12; left: 12px; right: 12px; bottom: 112px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .tabBtn, .actionBtn { border-radius: 18px; background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.8); box-shadow: 0 10px 26px rgba(60,40,30,.14); color: var(--ink); min-height: 52px; font-size: 11px; font-weight: 900; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: transform .18s ease, background .18s ease, box-shadow .18s ease; }
+    .tabBtn span, .actionBtn span { font-size: 19px; line-height: 1; }
+    .tabBtn.active { background: #fff; transform: translateY(-2px); box-shadow: 0 14px 30px rgba(255, 123, 96, .22); }
+    .tabBtn:active, .actionBtn:active { transform: scale(.96); }
+    #actionsBar { position: absolute; z-index: 13; left: 12px; right: 12px; bottom: 14px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .actionBtn { min-height: 84px; background: rgba(255,255,255,.78); }
+    .actionBtn:disabled { opacity: .45; filter: grayscale(.5); cursor: not-allowed; }
+    #toast { position: absolute; z-index: 30; left: 50%; bottom: 214px; transform: translateX(-50%) translateY(18px); background: rgba(45, 35, 30, .86); color: white; border-radius: 999px; padding: 10px 16px; font-weight: 900; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.22); opacity: 0; pointer-events: none; transition: opacity .25s ease, transform .25s ease; max-width: calc(100% - 36px); text-align: center; white-space: nowrap; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #speechBubble { position: absolute; z-index: 15; left: 50%; top: 44%; transform: translate(-50%, -140%); background: rgba(255,255,255,.92); border: 1px solid rgba(255,255,255,.95); border-radius: 22px; padding: 10px 14px; box-shadow: 0 12px 35px rgba(70,40,25,.14); font-weight: 900; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .22s ease; text-align: center; }
+    #speechBubble.show { opacity: 1; transform: translate(-50%, -152%); }
+    #speechBubble:after { content: ""; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%) rotate(45deg); width: 16px; height: 16px; background: inherit; border-right: inherit; border-bottom: inherit; }
+    #loaderScreen { position: absolute; z-index: 50; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: linear-gradient(180deg, #fff7e8, #ffdcca 55%, #cbf5ef); padding: 24px; text-align: center; }
+    .loaderLogo { width: 92px; height: 92px; border-radius: 32px; background: rgba(255,255,255,.72); display: grid; place-items: center; font-size: 46px; box-shadow: var(--shadow); animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    #loaderScreen h2 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
+    #loaderScreen p { margin: 0; font-size: 13px; line-height: 1.45; max-width: 320px; opacity: .74; }
+    .miniProgress { width: min(280px, 80%); height: 9px; background: rgba(255,255,255,.58); border-radius: 999px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.7); }
+    #miniProgressFill { height: 100%; width: 12%; background: linear-gradient(90deg, #ff8f70, #9ee8df); border-radius: inherit; transition: width .3s ease; }
+    #dailyModal { position: absolute; z-index: 40; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(40, 28, 20, .28); backdrop-filter: blur(8px); padding: 22px; }
+    #dailyModal.show { display: flex; }
+    .modalCard { width: min(340px, 100%); background: rgba(255,255,255,.92); border-radius: 30px; padding: 22px; box-shadow: 0 25px 70px rgba(45,30,20,.24); border: 1px solid rgba(255,255,255,.9); text-align: center; }
+    .modalCard h2 { margin: 0 0 8px; font-size: 24px; letter-spacing: -.04em; }
+    .modalCard p { margin: 0 0 18px; font-size: 14px; opacity: .74; line-height: 1.4; }
+    .claimBtn { width: 100%; min-height: 54px; border-radius: 18px; background: linear-gradient(135deg, #ff8f70, #ffc069); color: white; font-weight: 1000; box-shadow: 0 12px 26px rgba(255, 130, 90, .3); }
+    #infoPill { position: absolute; z-index: 16; left: 50%; top: 16px; transform: translateX(-50%); background: rgba(45, 35, 30, .75); color: white; padding: 8px 12px; font-size: 11px; font-weight: 900; border-radius: 999px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+    #infoPill strong { color: #ffd58f; }
+    @media (max-height: 720px) {
+      #statsPanel { top: 78px; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+      .stat { padding: 6px; border-radius: 14px; }
+      .statTop { font-size: 9px; margin-bottom: 4px; }
+      #roomTabs { bottom: 98px; }
+      .actionBtn { min-height: 74px; }
+      .tabBtn { min-height: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="appShell">
+    <main id="phoneFrame" aria-label="Cozy Pup Companion game">
+      <div id="pixiMount"></div>
+      <div id="infoPill">Tail wag test: <strong>8-frame looping idle animation</strong></div>
 
-src = Path("/mnt/data/virtual-pet-tailwag-test-url.html")
-html = src.read_text(encoding="utf-8")
+      <section id="topHud">
+        <div class="petCard">
+          <h1 id="petName">Cozy Pup · Lv. 1</h1>
+          <p id="petMood">Testing the new idle tail wag loop.</p>
+        </div>
+        <div class="coinsCard"><span>🦴</span><span id="coinCount">45</span></div>
+      </section>
 
-sprite_url = "https://ccpyles11.github.io/mine-pet/tail_wag_sheet.png"
+      <section id="statsPanel" aria-label="Pet needs">
+        <div class="stat"><div class="statTop"><span>🍗 Hunger</span><span id="hungerText">82%</span></div><div class="bar"><div id="hungerFill" class="fill"></div></div></div>
+        <div class="stat"><div class="statTop"><span>💖 Happy</span><span id="happinessText">78%</span></div><div class="bar"><div id="happinessFill" class="fill happiness"></div></div></div>
+        <div class="stat"><div class="statTop"><span>🫧 Clean</span><span id="cleanlinessText">86%</span></div><div class="bar"><div id="cleanlinessFill" class="fill cleanliness"></div></div></div>
+        <div class="stat"><div class="statTop"><span>⚡ Energy</span><span id="energyText">74%</span></div><div class="bar"><div id="energyFill" class="fill energy"></div></div></div>
+      </section>
 
-html, count = re.subn(
-    r"const TAIL_WAG_SHEET = '[^']*';",
-    f"const TAIL_WAG_SHEET = '{sprite_url}';",
-    html,
-    count=1
-)
+      <div id="speechBubble">Woof!</div>
+      <div id="toast">Saved</div>
 
-if count != 1:
-    raise ValueError("Could not update TAIL_WAG_SHEET URL.")
+      <nav id="roomTabs" aria-label="Rooms">
+        <button class="tabBtn active" data-room="home"><span>🏠</span>Room</button>
+        <button class="tabBtn" data-room="kitchen"><span>🍽️</span>Kitchen</button>
+        <button class="tabBtn" data-room="bathroom"><span>🛁</span>Bath</button>
+        <button class="tabBtn" data-room="park"><span>🌳</span>Park</button>
+      </nav>
 
-# Clean up now inaccurate placeholder example comments if present; keep one useful comment.
-html = re.sub(
-    r"\n\s*// Replace the URL above with your hosted tail wag sprite sheet URL\.\n\s*// Example: https://your-project\.supabase\.co/storage/v1/object/public/companion-images/pet-sprites/tail_wag_sheet\.png",
-    "\n    // Tail wag sprite sheet: 8 frames, 4 columns x 2 rows.",
-    html,
-    count=1
-)
+      <section id="actionsBar" aria-label="Pet actions">
+        <button class="actionBtn" data-action="feed"><span>🍗</span>Feed</button>
+        <button class="actionBtn" data-action="drink"><span>💧</span>Drink</button>
+        <button class="actionBtn" data-action="play"><span>🎾</span>Play</button>
+        <button class="actionBtn" data-action="bath"><span>🫧</span>Bath</button>
+        <button class="actionBtn" data-action="sleep"><span>🌙</span>Rest</button>
+      </section>
 
-out = Path("/mnt/data/virtual-pet-tailwag-test-github-url.html")
-out.write_text(html, encoding="utf-8")
+      <section id="dailyModal" aria-label="Daily reward">
+        <div class="modalCard">
+          <div style="font-size:48px; margin-bottom:8px;">🎁</div>
+          <h2>Daily Treat Bonus</h2>
+          <p>Your pup missed you. Claim today’s bonus and give your companion a little boost.</p>
+          <button id="claimDailyBtn" class="claimBtn">Claim +25 Bones</button>
+        </div>
+      </section>
 
-out.stat().st_size
+      <section id="loaderScreen">
+        <div class="loaderLogo">🐶</div>
+        <h2>Cozy Pup Companion</h2>
+        <p id="loaderStatus">Loading your tail wag sprite sheet...</p>
+        <div class="miniProgress"><div id="miniProgressFill"></div></div>
+        <p>This test build slices your 8-frame sheet into a continuously looping idle animation.</p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const TAIL_WAG_SHEET = 'https://ccpyles11.github.io/mine-pet/tail_wag_sheet.png';
+    // Tail wag sprite sheet: 8 frames, 4 columns x 2 rows.
+    const SPRITE_SHEET_SPECS = { columns: 4, rows: 2, totalFrames: 8, animationSpeed: 0.12 };
+    const SAVE_KEY = 'cozy_pup_tailwag_test_v1';
+    const $ = (id) => document.getElementById(id);
+    const mount = $('pixiMount');
+    const loader = $('loaderScreen');
+    const loaderStatus = $('loaderStatus');
+    const progressFill = $('miniProgressFill');
+    const toastEl = $('toast');
+    const bubbleEl = $('speechBubble');
+
+    let app, dogAnim, dogContainer, dogShadow, roomLayer, propLayer, fxLayer;
+    let resizeRAF = null;
+
+    const defaultGame = () => ({
+      name: 'Cozy Pup',
+      room: 'home',
+      hunger: 82,
+      happiness: 78,
+      cleanliness: 86,
+      energy: 74,
+      coins: 45,
+      xp: 0,
+      level: 1,
+      lastSave: Date.now(),
+      lastDaily: null,
+      unlocked: { rug: false, plant: false, toyBasket: false }
+    });
+    let game = defaultGame();
+
+    function clamp(n, min = 0, max = 100) { return Math.max(min, Math.min(max, n)); }
+    function pct(n) { return Math.round(clamp(n)); }
+    function todayKey() { return new Date().toISOString().slice(0, 10); }
+
+    function toast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add('show');
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(() => toastEl.classList.remove('show'), 1700);
+    }
+
+    function speak(message) {
+      bubbleEl.textContent = message;
+      bubbleEl.classList.add('show');
+      clearTimeout(bubbleEl._t);
+      bubbleEl._t = setTimeout(() => bubbleEl.classList.remove('show'), 1400);
+    }
+
+    function loadSave() {
+      try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (raw) game = { ...defaultGame(), ...JSON.parse(raw) };
+      } catch (e) { game = defaultGame(); }
+
+      const now = Date.now();
+      const minutesAway = Math.max(0, (now - (game.lastSave || now)) / 60000);
+      if (minutesAway > 1) {
+        game.hunger = clamp(game.hunger - minutesAway * 0.28);
+        game.happiness = clamp(game.happiness - minutesAway * 0.18);
+        game.cleanliness = clamp(game.cleanliness - minutesAway * 0.10);
+        game.energy = clamp(game.energy + minutesAway * 0.20);
+      }
+      game.lastSave = now;
+      saveGame();
+    }
+
+    function saveGame() {
+      game.lastSave = Date.now();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+    }
+
+    function addXP(amount) {
+      game.xp += amount;
+      const needed = game.level * 60;
+      if (game.xp >= needed) {
+        game.xp -= needed;
+        game.level += 1;
+        game.coins += 20;
+        if (game.level >= 2) game.unlocked.rug = true;
+        if (game.level >= 3) game.unlocked.plant = true;
+        if (game.level >= 4) game.unlocked.toyBasket = true;
+        toast(`Level ${game.level}! +20 bones`);
+        sparkle(12);
+      }
+    }
+
+    function updateHUD() {
+      $('petName').textContent = `${game.name} · Lv. ${game.level}`;
+      $('coinCount').textContent = game.coins;
+      ['hunger','happiness','cleanliness','energy'].forEach(s => {
+        $(s + 'Text').textContent = pct(game[s]) + '%';
+        $(s + 'Fill').style.width = pct(game[s]) + '%';
+      });
+      let mood = 'Tail wag test is active.';
+      if (game.hunger < 25) mood = 'Hungry but still wagging.';
+      else if (game.cleanliness < 25) mood = 'Needs a bath, still cute.';
+      else if (game.energy < 20) mood = 'Sleepy little wag machine.';
+      else if (game.happiness < 30) mood = 'Needs more love and playtime.';
+      else if (game.happiness > 85 && game.hunger > 70) mood = 'Living the good puppy life.';
+      $('petMood').textContent = mood;
+      document.querySelectorAll('.tabBtn').forEach(b => b.classList.toggle('active', b.dataset.room === game.room));
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function sliceSpriteSheet(baseTexture, sheetWidth, sheetHeight, columns, rows, totalFrames) {
+      const frameWidth = sheetWidth / columns;
+      const frameHeight = sheetHeight / rows;
+      const frames = [];
+      for (let i = 0; i < totalFrames; i++) {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const rect = new PIXI.Rectangle(
+          Math.round(col * frameWidth),
+          Math.round(row * frameHeight),
+          Math.round(frameWidth),
+          Math.round(frameHeight)
+        );
+        frames.push(new PIXI.Texture(baseTexture, rect));
+      }
+      return { frames, frameWidth, frameHeight };
+    }
+
+    function fitDog() {
+      if (!dogContainer || !dogAnim) return;
+      const w = mount.clientWidth || 390;
+      const h = mount.clientHeight || 780;
+      const maxW = w * 0.58;
+      const maxH = h * 0.34;
+      const scale = Math.min(maxW / dogAnim.width, maxH / dogAnim.height);
+      dogContainer.scale.set(scale);
+      dogContainer.x = w / 2;
+      dogContainer.y = h * 0.58;
+      dogShadow.x = dogContainer.x;
+      dogShadow.y = dogContainer.y + Math.max(80, dogAnim.height * scale * 0.34);
+      dogShadow.width = Math.max(140, dogAnim.width * scale * 0.8);
+      dogShadow.height = 26;
+    }
+
+    function drawRoundedRect(g, x, y, w, h, r, color, alpha = 1) {
+      g.beginFill(color, alpha); g.drawRoundedRect(x, y, w, h, r); g.endFill();
+    }
+
+    function renderRoom() {
+      const w = mount.clientWidth || 390;
+      const h = mount.clientHeight || 780;
+      roomLayer.removeChildren();
+      propLayer.removeChildren();
+      const bg = new PIXI.Graphics();
+      roomLayer.addChild(bg);
+
+      const palettes = {
+        home: ['#ffe8d6', '#ffd5bd', '#fef6e8'],
+        kitchen: ['#e2f8f5', '#c7efe9', '#fffaf0'],
+        bathroom: ['#dff5ff', '#c8ecfb', '#f6fbff'],
+        park: ['#daf6d6', '#c3eebc', '#eefae7']
+      };
+      const [c1, c2, c3] = palettes[game.room];
+      bg.beginFill(PIXI.utils.string2hex(c1));
+      bg.drawRect(0, 0, w, h);
+      bg.endFill();
+
+      const topGlow = new PIXI.Graphics();
+      topGlow.beginFill(0xffffff, .35);
+      topGlow.drawEllipse(w * .35, h * .15, w * .55, h * .18);
+      topGlow.endFill();
+      roomLayer.addChild(topGlow);
+
+      const floor = new PIXI.Graphics();
+      floor.beginFill(PIXI.utils.string2hex(c2));
+      floor.drawRoundedRect(-10, h * .62, w + 20, h * .42, 28);
+      floor.endFill();
+      roomLayer.addChild(floor);
+
+      if (game.room === 'home') {
+        const wall = new PIXI.Graphics();
+        drawRoundedRect(wall, 22, 156, w - 44, h * .42, 28, PIXI.utils.string2hex(c3), .95);
+        roomLayer.addChild(wall);
+        if (game.unlocked.rug) {
+          const rug = new PIXI.Graphics();
+          rug.beginFill(0xffd7bd); rug.drawRoundedRect(w * .15, h * .70, w * .7, 70, 34); rug.endFill();
+          propLayer.addChild(rug);
+        }
+        const bed = new PIXI.Graphics();
+        bed.beginFill(0xffc4aa); bed.drawRoundedRect(w * .12, h * .67, w * .28, 84, 28); bed.endFill();
+        bed.beginFill(0xffebdf); bed.drawRoundedRect(w * .15, h * .69, w * .22, 46, 24); bed.endFill();
+        propLayer.addChild(bed);
+        if (game.unlocked.plant) {
+          const plant = new PIXI.Graphics();
+          plant.beginFill(0x87d39c); plant.drawCircle(w * .84, h * .60, 26); plant.endFill();
+          plant.beginFill(0xc99460); plant.drawRoundedRect(w * .81, h * .63, 24, 26, 8); plant.endFill();
+          propLayer.addChild(plant);
+        }
+      }
+
+      if (game.room === 'kitchen') {
+        const counter = new PIXI.Graphics();
+        counter.beginFill(0xfff6ec); counter.drawRoundedRect(20, h * .22, w - 40, 136, 28); counter.endFill();
+        counter.beginFill(0xf4d1aa); counter.drawRoundedRect(20, h * .22, w - 40, 26, 22); counter.endFill();
+        propLayer.addChild(counter);
+        drawBowl(w * .30, h * .73, 0xf2b35d, 'food');
+        drawBowl(w * .68, h * .73, 0x7cd7f0, 'water');
+      }
+
+      if (game.room === 'bathroom') {
+        const tub = new PIXI.Graphics();
+        tub.beginFill(0xffffff); tub.drawRoundedRect(w * .14, h * .65, w * .72, 92, 34); tub.endFill();
+        tub.beginFill(0xdaf1ff); tub.drawRoundedRect(w * .18, h * .64, w * .64, 26, 18); tub.endFill();
+        propLayer.addChild(tub);
+        for (let i = 0; i < 8; i++) {
+          const bub = new PIXI.Graphics();
+          bub.beginFill(0xffffff, .85); bub.drawCircle(w * .24 + i * 26, h * .61 + (i % 2) * 9, 11 + (i % 3)); bub.endFill();
+          propLayer.addChild(bub);
+        }
+      }
+
+      if (game.room === 'park') {
+        const sun = new PIXI.Graphics();
+        sun.beginFill(0xffd36d); sun.drawCircle(w * .83, 108, 34); sun.endFill();
+        roomLayer.addChild(sun);
+        const hill1 = new PIXI.Graphics();
+        hill1.beginFill(0x8fd987); hill1.drawEllipse(w * .28, h * .67, w * .42, 118); hill1.endFill();
+        const hill2 = new PIXI.Graphics();
+        hill2.beginFill(0x77c96d); hill2.drawEllipse(w * .72, h * .70, w * .45, 126); hill2.endFill();
+        propLayer.addChild(hill1, hill2);
+        const ball = new PIXI.Graphics();
+        ball.beginFill(0xff8f70); ball.drawCircle(w * .77, h * .76, 22); ball.endFill();
+        ball.beginFill(0xffffff); ball.drawCircle(w * .77, h * .76, 9); ball.endFill();
+        propLayer.addChild(ball);
+      }
+    }
+
+    function drawBowl(x, y, color, type) {
+      const bowl = new PIXI.Graphics();
+      bowl.beginFill(0xffffff); bowl.drawRoundedRect(x - 28, y, 56, 22, 10); bowl.endFill();
+      bowl.beginFill(color); bowl.drawRoundedRect(x - 22, y + 3, 44, 10, 8); bowl.endFill();
+      propLayer.addChild(bowl);
+      if (type === 'food') {
+        for (let i = 0; i < 6; i++) {
+          const kibble = new PIXI.Graphics();
+          kibble.beginFill(0xa86d39); kibble.drawCircle(x - 15 + i * 5, y + 6 + (i % 2) * 3, 3); kibble.endFill();
+          propLayer.addChild(kibble);
+        }
+      }
+    }
+
+    function sparkle(count = 8, emoji = '✨') {
+      const w = mount.clientWidth || 390;
+      const h = mount.clientHeight || 780;
+      for (let i = 0; i < count; i++) {
+        const t = new PIXI.Text(emoji, { fontFamily: 'Apple Color Emoji, Segoe UI Emoji, sans-serif', fontSize: 18 + Math.random() * 10 });
+        t.anchor.set(.5);
+        t.x = w * 0.5 + (Math.random() - .5) * 120;
+        t.y = h * 0.5 + (Math.random() - .5) * 60;
+        t.alpha = 0.95;
+        t.vx = (Math.random() - .5) * 1.6;
+        t.vy = -1.2 - Math.random() * 1.6;
+        fxLayer.addChild(t);
+        t.life = 50 + Math.random() * 16;
+      }
+    }
+
+    function animateTapBounce() {
+      if (!dogContainer) return;
+      const startScale = dogContainer.scale.x;
+      let frame = 0;
+      const total = 18;
+      const tickerFn = () => {
+        frame++;
+        const phase = frame / total;
+        const bump = phase < .5 ? 1 + phase * .08 : 1.04 - (phase - .5) * .08;
+        dogContainer.scale.set(startScale * bump);
+        if (frame >= total) {
+          dogContainer.scale.set(startScale);
+          app.ticker.remove(tickerFn);
+        }
+      };
+      app.ticker.add(tickerFn);
+    }
+
+    function setupInteractions() {
+      document.querySelectorAll('.tabBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          game.room = btn.dataset.room;
+          renderRoom();
+          fitDog();
+          updateHUD();
+          saveGame();
+          toast(`Moved to ${btn.textContent.trim()}`);
+        });
+      });
+
+      document.querySelectorAll('.actionBtn').forEach(btn => {
+        btn.addEventListener('click', () => handleAction(btn.dataset.action));
+      });
+
+      $('claimDailyBtn').addEventListener('click', () => {
+        game.coins += 25;
+        game.happiness = clamp(game.happiness + 8);
+        game.lastDaily = todayKey();
+        $('dailyModal').classList.remove('show');
+        sparkle(14, '🦴');
+        toast('Daily reward claimed!');
+        updateHUD();
+        saveGame();
+      });
+    }
+
+    function handleAction(action) {
+      if (action === 'feed') {
+        if (game.room !== 'kitchen') return toast('Go to the kitchen to feed your pup.');
+        game.hunger = clamp(game.hunger + 20);
+        game.happiness = clamp(game.happiness + 4);
+        game.energy = clamp(game.energy + 2);
+        addXP(8); sparkle(8, '🍗'); speak('Nom nom!');
+      } else if (action === 'drink') {
+        if (game.room !== 'kitchen') return toast('Go to the kitchen for water.');
+        game.energy = clamp(game.energy + 6);
+        game.happiness = clamp(game.happiness + 2);
+        addXP(5); sparkle(6, '💧'); speak('Slurp!');
+      } else if (action === 'play') {
+        if (game.room !== 'park') return toast('Go to the park to play.');
+        if (game.energy < 12) return toast('Too sleepy to play right now.');
+        game.happiness = clamp(game.happiness + 18);
+        game.energy = clamp(game.energy - 12);
+        game.cleanliness = clamp(game.cleanliness - 4);
+        addXP(12); sparkle(12, '🎾'); speak('Best day ever!');
+      } else if (action === 'bath') {
+        if (game.room !== 'bathroom') return toast('Go to the bath room first.');
+        game.cleanliness = clamp(game.cleanliness + 24);
+        game.happiness = clamp(game.happiness + 4);
+        addXP(10); sparkle(12, '🫧'); speak('Fresh and clean!');
+      } else if (action === 'sleep') {
+        if (game.room !== 'home') return toast('Go back to the room to rest.');
+        game.energy = clamp(game.energy + 18);
+        game.happiness = clamp(game.happiness + 5);
+        addXP(8); sparkle(8, '💤'); speak('Zzz... cozy...');
+      }
+      updateHUD();
+      saveGame();
+    }
+
+    function maybeShowDaily() {
+      if (game.lastDaily !== todayKey()) $('dailyModal').classList.add('show');
+    }
+
+    async function startPixi() {
+      loadSave();
+      loaderStatus.textContent = 'Creating game scene...';
+      progressFill.style.width = '20%';
+      app = new PIXI.Application({
+        resizeTo: mount,
+        antialias: true,
+        autoDensity: true,
+        backgroundAlpha: 0,
+        resolution: Math.min(window.devicePixelRatio || 1, 2)
+      });
+      mount.appendChild(app.view);
+
+      roomLayer = new PIXI.Container();
+      propLayer = new PIXI.Container();
+      fxLayer = new PIXI.Container();
+      dogContainer = new PIXI.Container();
+      app.stage.addChild(roomLayer, propLayer, dogContainer, fxLayer);
+
+      dogShadow = new PIXI.Graphics();
+      dogShadow.beginFill(0x000000, .11); dogShadow.drawEllipse(0, 0, 160, 24); dogShadow.endFill();
+      dogShadow.filters = [new PIXI.BlurFilter(6)];
+      app.stage.addChildAt(dogShadow, 2);
+
+      loaderStatus.textContent = 'Loading tail wag sprite sheet...';
+      progressFill.style.width = '45%';
+      const img = await loadImage(TAIL_WAG_SHEET);
+      const baseTexture = PIXI.BaseTexture.from(img);
+      const sliced = sliceSpriteSheet(baseTexture, img.naturalWidth, img.naturalHeight, SPRITE_SHEET_SPECS.columns, SPRITE_SHEET_SPECS.rows, SPRITE_SHEET_SPECS.totalFrames);
+
+      loaderStatus.textContent = 'Building idle animation...';
+      progressFill.style.width = '70%';
+      dogAnim = new PIXI.AnimatedSprite(sliced.frames);
+      dogAnim.animationSpeed = SPRITE_SHEET_SPECS.animationSpeed;
+      dogAnim.loop = true;
+      dogAnim.anchor.set(.5, 1);
+      dogAnim.eventMode = 'static';
+      dogAnim.cursor = 'pointer';
+      dogAnim.on('pointertap', () => {
+        game.happiness = clamp(game.happiness + 3);
+        game.energy = clamp(game.energy - .5);
+        animateTapBounce();
+        sparkle(8, '💖');
+        speak('Woof!');
+        updateHUD();
+        saveGame();
+      });
+      dogContainer.addChild(dogAnim);
+      dogAnim.play();
+
+      renderRoom();
+      fitDog();
+      updateHUD();
+      setupInteractions();
+      maybeShowDaily();
+
+      app.ticker.add((ticker) => {
+        const dt = ticker.deltaMS / 1000;
+        if (dogContainer) dogContainer.y += Math.sin(performance.now() / 300) * 0.05;
+        if (dogAnim) dogAnim.y = Math.sin(performance.now() / 320) * 4;
+        game.hunger = clamp(game.hunger - dt * 0.06);
+        game.happiness = clamp(game.happiness - dt * 0.04);
+        game.cleanliness = clamp(game.cleanliness - dt * 0.02);
+        game.energy = clamp(game.energy - dt * 0.018);
+        for (let i = fxLayer.children.length - 1; i >= 0; i--) {
+          const node = fxLayer.children[i];
+          node.x += node.vx || 0;
+          node.y += node.vy || 0;
+          node.alpha -= 0.018;
+          node.life -= 1;
+          if (node.life <= 0 || node.alpha <= 0) fxLayer.removeChild(node);
+        }
+      });
+
+      setInterval(() => { updateHUD(); saveGame(); }, 3000);
+
+      window.addEventListener('resize', () => {
+        cancelAnimationFrame(resizeRAF);
+        resizeRAF = requestAnimationFrame(() => { renderRoom(); fitDog(); });
+      });
+
+      progressFill.style.width = '100%';
+      loaderStatus.textContent = 'Tail wag test ready.';
+      setTimeout(() => loader.style.display = 'none', 650);
+    }
+
+    startPixi().catch(err => {
+      console.error(err);
+      loader.innerHTML = `<div class="loaderLogo">⚠️</div><h2>Could not load sprite sheet</h2><p>${String(err.message || err)}</p><p>Make sure PixiJS loads and the sprite sheet data is valid.</p>`;
+    });
+  </script>
+</body>
+</html>
