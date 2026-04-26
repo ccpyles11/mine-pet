@@ -78,7 +78,7 @@
   <div id="appShell">
     <main id="phoneFrame" aria-label="Cozy Pup Companion game">
       <div id="pixiMount"></div>
-      <div id="infoPill">Tail wag test: <strong>8-frame looping idle animation</strong></div>
+      <div id="infoPill">Tail wag test: <strong>443×443 frames · transparency fixed</strong></div>
 
       <section id="topHud">
         <div class="petCard">
@@ -135,7 +135,7 @@
   <script>
     const TAIL_WAG_SHEET = 'https://ccpyles11.github.io/mine-pet/tail_wag_sheet.png';
     // Tail wag sprite sheet: 8 frames, 4 columns x 2 rows.
-    const SPRITE_SHEET_SPECS = { columns: 4, rows: 2, totalFrames: 8, animationSpeed: 0.12 };
+    const SPRITE_SHEET_SPECS = { columns: 4, rows: 2, totalFrames: 8, frameWidth: 443, frameHeight: 443, animationSpeed: 0.12 };
     const SAVE_KEY = 'cozy_pup_tailwag_test_v1';
     const $ = (id) => document.getElementById(id);
     const mount = $('pixiMount');
@@ -164,8 +164,38 @@
     });
     let game = defaultGame();
 
-    function clamp(n, min = 0, max = 100) { return Math.max(min, Math.min(max, n)); }
-    function pct(n) { return Math.round(clamp(n)); }
+    function asNumber(value, fallback) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function clamp(n, min = 0, max = 100) {
+      n = asNumber(n, min);
+      return Math.max(min, Math.min(max, n));
+    }
+
+    function pct(n) {
+      return Math.round(clamp(n, 0, 100));
+    }
+
+    function sanitizeGameState(value) {
+      const base = defaultGame();
+      const merged = { ...base, ...(value || {}) };
+      merged.name = typeof merged.name === "string" && merged.name.trim() ? merged.name : base.name;
+      merged.room = ["home", "kitchen", "bathroom", "park"].includes(merged.room) ? merged.room : base.room;
+      merged.hunger = clamp(merged.hunger, 0, 100);
+      merged.happiness = clamp(merged.happiness, 0, 100);
+      merged.cleanliness = clamp(merged.cleanliness, 0, 100);
+      merged.energy = clamp(merged.energy, 0, 100);
+      merged.coins = Math.max(0, Math.round(asNumber(merged.coins, base.coins)));
+      merged.xp = Math.max(0, Math.round(asNumber(merged.xp, base.xp)));
+      merged.level = Math.max(1, Math.round(asNumber(merged.level, base.level)));
+      merged.lastSave = asNumber(merged.lastSave, Date.now());
+      merged.lastDaily = typeof merged.lastDaily === "string" ? merged.lastDaily : null;
+      merged.unlocked = { ...base.unlocked, ...(merged.unlocked || {}) };
+      return merged;
+    }
+
     function todayKey() { return new Date().toISOString().slice(0, 10); }
 
     function toast(message) {
@@ -185,8 +215,11 @@
     function loadSave() {
       try {
         const raw = localStorage.getItem(SAVE_KEY);
-        if (raw) game = { ...defaultGame(), ...JSON.parse(raw) };
-      } catch (e) { game = defaultGame(); }
+        game = raw ? sanitizeGameState(JSON.parse(raw)) : defaultGame();
+      } catch (e) {
+        game = defaultGame();
+        localStorage.removeItem(SAVE_KEY);
+      }
 
       const now = Date.now();
       const minutesAway = Math.max(0, (now - (game.lastSave || now)) / 60000);
@@ -196,11 +229,13 @@
         game.cleanliness = clamp(game.cleanliness - minutesAway * 0.10);
         game.energy = clamp(game.energy + minutesAway * 0.20);
       }
+      game = sanitizeGameState(game);
       game.lastSave = now;
       saveGame();
     }
 
     function saveGame() {
+      game = sanitizeGameState(game);
       game.lastSave = Date.now();
       localStorage.setItem(SAVE_KEY, JSON.stringify(game));
     }
@@ -247,19 +282,81 @@
       });
     }
 
-    function sliceSpriteSheet(baseTexture, sheetWidth, sheetHeight, columns, rows, totalFrames) {
-      const frameWidth = sheetWidth / columns;
-      const frameHeight = sheetHeight / rows;
+    function isCheckerboardBackgroundPixel(r, g, b, a) {
+      if (a < 10) return true;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const avg = (r + g + b) / 3;
+      // Generated checkerboard pixels are light gray/white and nearly neutral.
+      // This intentionally avoids removing the dog's colored/cream areas.
+      return avg >= 218 && (max - min) <= 14;
+    }
+
+    function makeCheckerboardTransparent(img) {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const width = canvas.width;
+      const height = canvas.height;
+      const visited = new Uint8Array(width * height);
+      const queue = [];
+
+      function tryAdd(x, y) {
+        if (x < 0 || y < 0 || x >= width || y >= height) return;
+        const idx = y * width + x;
+        if (visited[idx]) return;
+        const p = idx * 4;
+        if (isCheckerboardBackgroundPixel(data[p], data[p + 1], data[p + 2], data[p + 3])) {
+          visited[idx] = 1;
+          queue.push(idx);
+        }
+      }
+
+      // Flood-fill from the outside only. This removes the baked-in checkerboard
+      // background while preserving light details inside the dog outline.
+      for (let x = 0; x < width; x++) {
+        tryAdd(x, 0);
+        tryAdd(x, height - 1);
+      }
+      for (let y = 0; y < height; y++) {
+        tryAdd(0, y);
+        tryAdd(width - 1, y);
+      }
+
+      let head = 0;
+      while (head < queue.length) {
+        const idx = queue[head++];
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        const p = idx * 4;
+        data[p + 3] = 0;
+        tryAdd(x + 1, y);
+        tryAdd(x - 1, y);
+        tryAdd(x, y + 1);
+        tryAdd(x, y - 1);
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    function sliceSpriteSheet(baseTexture, sheetWidth, sheetHeight, columns, rows, totalFrames, explicitFrameWidth, explicitFrameHeight) {
+      const frameWidth = explicitFrameWidth || Math.floor(sheetWidth / columns);
+      const frameHeight = explicitFrameHeight || Math.floor(sheetHeight / rows);
       const frames = [];
       for (let i = 0; i < totalFrames; i++) {
         const col = i % columns;
         const row = Math.floor(i / columns);
-        const rect = new PIXI.Rectangle(
-          Math.round(col * frameWidth),
-          Math.round(row * frameHeight),
-          Math.round(frameWidth),
-          Math.round(frameHeight)
-        );
+        const x = col * frameWidth;
+        const y = row * frameHeight;
+        if (x + frameWidth > sheetWidth || y + frameHeight > sheetHeight) {
+          throw new Error(`Frame ${i} is out of bounds: X: ${x} + ${frameWidth} = ${x + frameWidth} > ${sheetWidth} or Y: ${y} + ${frameHeight} = ${y + frameHeight} > ${sheetHeight}`);
+        }
+        const rect = new PIXI.Rectangle(x, y, frameWidth, frameHeight);
         frames.push(new PIXI.Texture(baseTexture, rect));
       }
       return { frames, frameWidth, frameHeight };
@@ -515,8 +612,9 @@
       loaderStatus.textContent = 'Loading tail wag sprite sheet...';
       progressFill.style.width = '45%';
       const img = await loadImage(TAIL_WAG_SHEET);
-      const baseTexture = PIXI.BaseTexture.from(img);
-      const sliced = sliceSpriteSheet(baseTexture, img.naturalWidth, img.naturalHeight, SPRITE_SHEET_SPECS.columns, SPRITE_SHEET_SPECS.rows, SPRITE_SHEET_SPECS.totalFrames);
+      const cleanedSheet = makeCheckerboardTransparent(img);
+      const baseTexture = PIXI.BaseTexture.from(cleanedSheet);
+      const sliced = sliceSpriteSheet(baseTexture, cleanedSheet.width, cleanedSheet.height, SPRITE_SHEET_SPECS.columns, SPRITE_SHEET_SPECS.rows, SPRITE_SHEET_SPECS.totalFrames, SPRITE_SHEET_SPECS.frameWidth, SPRITE_SHEET_SPECS.frameHeight);
 
       loaderStatus.textContent = 'Building idle animation...';
       progressFill.style.width = '70%';
