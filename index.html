@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7d7c4" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Cozy Pup — Virtual Pet</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="appShell">
+    <section id="gameFrame" aria-label="Cozy Pup virtual pet game">
+      <div id="topHud">
+        <div class="brandBlock">
+          <div class="petAvatar">🐶</div>
+          <div>
+            <h1 id="petName">Cozy Pup</h1>
+            <p id="statusLine">Ready for love and snacks.</p>
+          </div>
+        </div>
+        <div class="currencyPill" title="Treat coins">
+          <span>🦴</span><strong id="coinsText">0</strong>
+        </div>
+      </div>
+
+      <div id="statsPanel">
+        <div class="stat"><span>Hunger</span><div class="bar"><i id="hungerBar"></i></div><b id="hungerText">100%</b></div>
+        <div class="stat"><span>Happy</span><div class="bar"><i id="happyBar"></i></div><b id="happyText">100%</b></div>
+        <div class="stat"><span>Clean</span><div class="bar"><i id="cleanBar"></i></div><b id="cleanText">100%</b></div>
+        <div class="stat"><span>Energy</span><div class="bar"><i id="energyBar"></i></div><b id="energyText">100%</b></div>
+      </div>
+
+      <canvas id="gameCanvas" width="720" height="1280"></canvas>
+
+      <div id="toast" role="status" aria-live="polite"></div>
+
+      <nav id="roomNav" aria-label="Rooms">
+        <button class="roomBtn active" data-room="living"><span>🛋️</span><small>Room</small></button>
+        <button class="roomBtn" data-room="kitchen"><span>🍽️</span><small>Kitchen</small></button>
+        <button class="roomBtn" data-room="bathroom"><span>🛁</span><small>Bath</small></button>
+        <button class="roomBtn" data-room="park"><span>🌳</span><small>Park</small></button>
+      </nav>
+
+      <section id="actionDock" aria-label="Pet actions">
+        <button class="actionBtn" data-action="feed"><span>🥣</span><b>Feed</b></button>
+        <button class="actionBtn" data-action="drink"><span>💧</span><b>Drink</b></button>
+        <button class="actionBtn" data-action="play"><span>🎾</span><b>Play</b></button>
+        <button class="actionBtn" data-action="bath"><span>🧼</span><b>Bath</b></button>
+        <button class="actionBtn" data-action="sleep"><span>💤</span><b>Rest</b></button>
+      </section>
+
+      <section id="bottomPanel">
+        <button id="dailyRewardBtn">🎁 Daily Treat</button>
+        <button id="renameBtn">✏️ Rename</button>
+        <button id="resetBtn">↺ Reset</button>
+      </section>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
